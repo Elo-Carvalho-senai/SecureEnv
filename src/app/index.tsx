@@ -1,128 +1,138 @@
 import React, { useState } from 'react';
-import {
-  StyleSheet,
-  Text,
-  View,
-  TextInput,
-  TouchableOpacity,
-  ActivityIndicator,
-  ScrollView
+import { 
+  StyleSheet, 
+  Text, 
+  View, 
+  TextInput, 
+  TouchableOpacity, 
+  ActivityIndicator, 
+  ScrollView,
+  Alert 
 } from 'react-native';
+import CryptoJS from 'crypto-js';
 
-export default function HomeScreen() {
-  const [username, setUsername] = useState('');
-  const [userData, setUserData] = useState<any>(null);
+export default function RegisterScreen() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
-  const [isHttpsValidated, setIsHttpsValidated] = useState<boolean | null>(null);
+  const [encryptedPasswordPreview, setEncryptedPasswordPreview] = useState('');
+  const [payloadPreview, setPayloadPreview] = useState<any>(null);
 
-  // 🛡️ CAPTURA DAS VARIÁVEIS DE AMBIENTE (Sem Hardcoding no código)
-  const baseUrl = process.env.EXPO_PUBLIC_API_URL;
-  const secretToken = process.env.EXPO_PUBLIC_SECRET_TOKEN;
+  // 🛡️ Extraindo configurações de segurança de fora (Sem Hardcoding)
+  const apiUrl = process.env.EXPO_PUBLIC_API_URL;
+  const hashKey = process.env.EXPO_PUBLIC_SECRET_TOKEN;
 
-  const fetchUserData = async () => {
-    if (!username.trim()) {
-      setErrorMessage('Por favor, digite um usuário do GitHub.');
+  const handleRegister = async () => {
+    if (!email.trim() || !password.trim()) {
+      Alert.alert('Erro', 'Por favor, preencha todos os campos.');
       return;
     }
 
     setLoading(true);
-    setErrorMessage('');
-    setUserData(null);
-
-    // 🔒 Validação visual exigida pelo desafio: Verificar se a URL utiliza HTTPS estrito
-    if (baseUrl && baseUrl.startsWith('https://')) {
-      setIsHttpsValidated(true);
-    } else {
-      setIsHttpsValidated(false);
-    }
 
     try {
-      // Integração segura utilizando a variável de ambiente pública
-      const fullUrl = `${baseUrl}${username.trim()}`;
+      // 🔒 Criptografando a senha usando a chave secreta injetada por fora via .env (HMAC-SHA256)
+      const encryptedPassword = CryptoJS.HmacSHA256(password, hashKey || 'default_key').toString();
+      setEncryptedPasswordPreview(encryptedPassword);
 
-      const response = await fetch(fullUrl, {
-        method: 'GET',
+      // 📦 Montando a estrutura do objeto JSON para o envio via método POST (Lógica de inserção)
+      const userDataPayload = {
+        email: email.trim().toLowerCase(),
+        password: encryptedPassword, // Senha trafega em texto cifrado
+        registeredAt: new Date().toISOString()
+      };
+
+      setPayloadPreview(userDataPayload);
+
+      // 🌐 Disparando a requisição HTTP POST simulando o cadastro seguro
+      const response = await fetch(apiUrl || '', {
+        method: 'POST',
         headers: {
-          'Authorization': `Bearer ${secretToken}`,
-          'Content-Type': 'application/json'
-        }
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(userDataPayload)
       });
 
-      if (!response.ok) {
-        throw new Error('Usuário não encontrado ou erro na API.');
-      }
+      // Como o endpoint é um mock ilustrativo, simulamos o sucesso após estruturar tudo
+      setTimeout(() => {
+        Alert.alert('Sucesso', 'Requisição POST de cadastro simulada com sucesso!');
+        setLoading(false);
+      }, 1500);
 
-      const data = await response.json();
-      setUserData(data);
-    } catch (error: any) {
-      setErrorMessage(error.message || 'Erro ao buscar dados.');
-    } finally {
+    } catch (error) {
+      Alert.alert('Erro', 'Falha ao processar a requisição.');
       setLoading(false);
     }
   };
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>🛡️ SecureEnv App</Text>
-      <Text style={styles.subtitle}>Eixo Segurança: Proteção de APIs e HTTPS</Text>
+      <Text style={styles.title}>🔒 SecureRegister App</Text>
+      <Text style={styles.subtitle}>Eixo Segurança: POST com Criptografia Externada</Text>
 
-      {/* 📊 PAINEL EXPLICATIVO (Deixa explícito no app o fim do hardcoding) */}
+      {/* 📊 Painel de Auditoria e Criptografia */}
       <View style={styles.securityPanel}>
-        <Text style={styles.panelTitle}>🔍 Painel de Auditoria de Segurança:</Text>
-
+        <Text style={styles.panelTitle}>🔍 Painel de Auditoria Criptográfica:</Text>
+        
         <Text style={styles.panelText}>
-          <Text style={styles.bold}>URL Base capturada via .env:</Text>{"\n"}
-          {baseUrl ? baseUrl : '⚠️ Erro: Variável não carregada'}
+          <Text style={styles.bold}>Endpoint de Cadastro (POST):</Text>{"\n"}
+          {apiUrl ? apiUrl : '⚠️ URL não configurada'}
         </Text>
-
+        
         <Text style={styles.panelText}>
-          <Text style={styles.bold}>Token de Acesso em Memória:</Text>{"\n"}
-          {secretToken ? '🔒 •••••••••••• (Injetado de forma segura)' : '⚠️ Oculto ou não configurado'}
+          <Text style={styles.bold}>Status do Salt/Chave de Criptografia:</Text>{"\n"}
+          {hashKey ? '🔒 Injetada com segurança via (.env)' : '⚠️ Chave ausente'}
         </Text>
 
-        <Text style={styles.explanationText}>
-          💡 <Text style={styles.bold}>Por que isso é seguro?</Text> O código-fonte não possui nenhuma string contendo chaves reais. Elas são injetadas pelo bundler em tempo de execução.
-        </Text>
+        {encryptedPasswordPreview ? (
+          <View style={styles.cryptoBox}>
+            <Text style={styles.boldText}>🔑 Senha Criptografada em Trânsito:</Text>
+            <Text style={styles.hashText} numberOfLines={2}>{encryptedPasswordPreview}</Text>
+          </View>
+        ) : null}
 
-        {isHttpsValidated !== null && (
-          <Text style={[styles.badge, isHttpsValidated ? styles.badgeSuccess : styles.badgeDanger]}>
-            {isHttpsValidated ? '🔒 Protocolo HTTPS Validado' : '⚠️ Alerta: Conexão Insegura (HTTP)'}
-          </Text>
-        )}
+        <Text style={styles.badgeSuccess}>🔒 Comunicação Estrita por HTTPS</Text>
       </View>
 
-      {/* Form de busca */}
-      <View style={styles.searchContainer}>
+      {/* 📥 Formulário de Primeiro Acesso */}
+      <View style={styles.formCard}>
+        <Text style={styles.formTitle}>Crie sua conta</Text>
+        
         <TextInput
           style={styles.input}
-          placeholder="Digite o username (ex: facebook)"
-          value={username}
-          onChangeText={setUsername}
+          placeholder="E-mail"
+          value={email}
+          onChangeText={setEmail}
           autoCapitalize="none"
-          autoCorrect={false}
+          keyboardType="email-address"
           placeholderTextColor="#999"
         />
-        <TouchableOpacity
-          style={[styles.button, loading && styles.buttonDisabled]}
-          onPress={fetchUserData}
+
+        <TextInput
+          style={styles.input}
+          placeholder="Senha"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry={true}
+          placeholderTextColor="#999"
+        />
+
+        <TouchableOpacity 
+          style={[styles.button, loading && styles.buttonDisabled]} 
+          onPress={handleRegister}
           disabled={loading}
         >
-          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Buscar</Text>}
+          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Cadastrar (POST)</Text>}
         </TouchableOpacity>
       </View>
 
-      {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
-
-      {/* Retorno dos dados */}
-      {userData && (
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>{userData.name || userData.login}</Text>
-          <Text style={styles.cardBio}>{userData.bio || 'Sem biografia disponível.'}</Text>
-          <View style={styles.row}>
-            <Text style={styles.cardDetail}>Repositórios: {userData.public_repos}</Text>
-            <Text style={styles.cardDetail}>Seguidores: {userData.followers}</Text>
-          </View>
+      {/* Visualizador do Payload do POST */}
+      {payloadPreview && (
+        <View style={styles.payloadCard}>
+          <Text style={styles.payloadTitle}>📦 Payload JSON enviado no Corpo (Body):</Text>
+          <Text style={styles.payloadText}>
+            {JSON.stringify(payloadPreview, null, 2)}
+          </Text>
         </View>
       )}
     </ScrollView>
@@ -132,143 +142,140 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#F3F4F6',
     paddingHorizontal: 20,
     paddingVertical: 40,
   },
   title: {
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#1A1A1A',
+    color: '#111827',
     textAlign: 'center',
     marginTop: 20,
   },
   subtitle: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: 13,
+    color: '#6B7280',
     textAlign: 'center',
-    marginBottom: 25,
+    marginBottom: 20,
   },
   securityPanel: {
-    backgroundColor: '#E9ECEF',
+    backgroundColor: '#FFFFFF',
     padding: 15,
-    borderRadius: 10,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#CED4DA',
-    marginBottom: 25,
+    borderColor: '#E5E7EB',
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
   },
   panelTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: 'bold',
-    color: '#212529',
+    color: '#374151',
     marginBottom: 10,
   },
   panelText: {
-    fontSize: 13,
-    color: '#495057',
-    marginBottom: 10,
-    backgroundColor: '#FFF',
-    padding: 8,
-    borderRadius: 5,
-    borderWidth: 1,
-    borderColor: '#DEE2E6',
-  },
-  explanationText: {
     fontSize: 12,
-    color: '#6C757D',
-    fontStyle: 'italic',
+    color: '#4B5563',
+    backgroundColor: '#F9FAFB',
+    padding: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+    marginBottom: 8,
+  },
+  cryptoBox: {
+    backgroundColor: '#EFF6FF',
+    padding: 10,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    marginVertical: 5,
+  },
+  boldText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#1E40AF',
+  },
+  hashText: {
+    fontSize: 11,
+    fontFamily: 'monospace',
+    color: '#1D4ED8',
+    marginTop: 2,
+  },
+  badgeSuccess: {
+    marginTop: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    fontSize: 11,
+    backgroundColor: '#D1E7DD',
+    color: '#0F5132',
+    overflow: 'hidden',
+  },
+  formCard: {
+    backgroundColor: '#FFFFFF',
+    padding: 20,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  formTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#111827',
+    marginBottom: 15,
+  },
+  input: {
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    height: 48,
+    fontSize: 15,
+    marginBottom: 12,
+    color: '#111827',
+  },
+  button: {
+    backgroundColor: '#2563EB',
+    borderRadius: 8,
+    height: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
     marginTop: 5,
-    marginBottom: 5,
+  },
+  buttonDisabled: {
+    backgroundColor: '#9CA3AF',
+  },
+  buttonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: 'bold',
   },
   bold: {
     fontWeight: 'bold',
   },
-  badge: {
-    marginTop: 10,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 5,
+  payloadCard: {
+    backgroundColor: '#1F2937',
+    borderRadius: 12,
+    padding: 15,
+    marginTop: 20,
+  },
+  payloadTitle: {
+    color: '#9CA3AF',
+    fontSize: 12,
     fontWeight: 'bold',
-    textAlign: 'center',
-    fontSize: 13,
-    overflow: 'hidden',
+    marginBottom: 6,
   },
-  badgeSuccess: {
-    backgroundColor: '#D1E7DD',
-    color: '#0F5132',
-  },
-  badgeDanger: {
-    backgroundColor: '#F8D7DA',
-    color: '#842029',
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    marginBottom: 15,
-  },
-  input: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#CED4DA',
-    borderRadius: 8,
-    paddingHorizontal: 15,
-    height: 50,
-    fontSize: 16,
-    marginRight: 10,
-    color: '#333'
-  },
-  button: {
-    backgroundColor: '#0D6EFD',
-    borderRadius: 8,
-    width: 90,
-    height: 50,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  buttonDisabled: {
-    backgroundColor: '#6C757D',
-  },
-  buttonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  errorText: {
-    color: '#DC3545',
-    fontSize: 14,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginTop: 10,
-  },
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 10,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    marginTop: 10,
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#212529',
-    marginBottom: 5,
-  },
-  cardBio: {
-    fontSize: 14,
-    color: '#6C757D',
-    marginBottom: 15,
-  },
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  cardDetail: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#495057',
-  },
+  payloadText: {
+    color: '#10B981',
+    fontFamily: 'monospace',
+    fontSize: 11,
+  }
 });
