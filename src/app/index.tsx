@@ -1,246 +1,274 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, ActivityIndicator, Image, StatusBar, SafeAreaView } from 'react-native';
+import React, { useState } from 'react';
+import {
+  StyleSheet,
+  Text,
+  View,
+  TextInput,
+  TouchableOpacity,
+  ActivityIndicator,
+  ScrollView
+} from 'react-native';
 
-interface PerfilGitHub {
-  name: string;
-  bio: string;
-  avatar_url: string;
-  public_repos: number;
-}
+export default function HomeScreen() {
+  const [username, setUsername] = useState('');
+  const [userData, setUserData] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [isHttpsValidated, setIsHttpsValidated] = useState<boolean | null>(null);
 
-export default function TelaPrincipal() {
-  const [perfil, setPerfil] = useState<PerfilGitHub | null>(null);
-  const [carregando, setCarregando] = useState<boolean>(true);
-  const [erro, setErro] = useState<string | null>(null);
+  // 🛡️ CAPTURA DAS VARIÁVEIS DE AMBIENTE (Sem Hardcoding no código)
+  const baseUrl = process.env.EXPO_PUBLIC_API_URL;
+  const secretToken = process.env.EXPO_PUBLIC_SECRET_TOKEN;
 
-  const processoAmbiente = process as any;
-  const urlApi = processoAmbiente.env?.EXPO_PUBLIC_API_URL || '';
-
-  useEffect(() => {
-    async function buscarDadosGitHub() {
-      try {
-        if (!urlApi) {
-          throw new Error("A variável EXPO_PUBLIC_API_URL não foi definida no seu arquivo .env!");
-        }
-
-        if (!urlApi.startsWith('https://')) {
-          throw new Error("Conexão insegura bloqueada! A URL da API precisa utilizar obrigatoriamente o protocolo HTTPS.");
-        }
-
-        const resposta = await fetch(`${urlApi}/github`);
-        
-        if (!resposta.ok) {
-          throw new Error(`Erro na requisição: Status ${resposta.status}`);
-        }
-
-        const dados = await resposta.json();
-        setPerfil(dados);
-      } catch (err: any) {
-        setErro(err.message || "Erro desconhecido ao carregar os dados.");
-      } finally {
-        setCarregando(false);
-      }
+  const fetchUserData = async () => {
+    if (!username.trim()) {
+      setErrorMessage('Por favor, digite um usuário do GitHub.');
+      return;
     }
 
-    buscarDadosGitHub();
-  }, [urlApi]);
+    setLoading(true);
+    setErrorMessage('');
+    setUserData(null);
+
+    // 🔒 Validação visual exigida pelo desafio: Verificar se a URL utiliza HTTPS estrito
+    if (baseUrl && baseUrl.startsWith('https://')) {
+      setIsHttpsValidated(true);
+    } else {
+      setIsHttpsValidated(false);
+    }
+
+    try {
+      // Integração segura utilizando a variável de ambiente pública
+      const fullUrl = `${baseUrl}${username.trim()}`;
+
+      const response = await fetch(fullUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${secretToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Usuário não encontrado ou erro na API.');
+      }
+
+      const data = await response.json();
+      setUserData(data);
+    } catch (error: any) {
+      setErrorMessage(error.message || 'Erro ao buscar dados.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <SafeAreaView style={estilos.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#0B0A0F" />
+    <ScrollView contentContainerStyle={styles.container}>
+      <Text style={styles.title}>🛡️ SecureEnv App</Text>
+      <Text style={styles.subtitle}>Eixo Segurança: Proteção de APIs e HTTPS</Text>
 
-      <View style={estilos.conteudo}>
-        {carregando ? (
-          <View style={estilos.containerCentral}>
-            <ActivityIndicator size="large" color="#7C3AED" />
-            <Text style={estilos.textoCarregando}>Validando ambiente seguro...</Text>
-          </View>
-        ) : erro ? (
-          <View style={estilos.cartaoErro}>
-            <Text style={estilos.erroTitulo}>🚨 Bloqueio de Segurança / Rede</Text>
-            <Text style={estilos.erroTexto}>{erro}</Text>
-          </View>
-        ) : (
-          <View style={estilos.cartaoSucesso}>
-            <View style={estilos.topoCartao}>
-              <Text style={estilos.appTitulo}>🔒 SecureEnv App</Text>
-              <Text style={estilos.appSubtitulo}>Proteção de Dados & Comunicação HTTPS</Text>
-            </View>
+      {/* 📊 PAINEL EXPLICATIVO (Deixa explícito no app o fim do hardcoding) */}
+      <View style={styles.securityPanel}>
+        <Text style={styles.panelTitle}>🔍 Painel de Auditoria de Segurança:</Text>
 
-            {perfil?.avatar_url ? (
-              <Image source={{ uri: perfil.avatar_url }} style={estilos.avatar} />
-            ) : null}
-            
-            <Text style={estilos.perfilNome}>{perfil?.name || "Usuário GitHub"}</Text>
-            <Text style={estilos.perfilBio}>{perfil?.bio || "Sem biografia disponível no perfil."}</Text>
-            
-            <View style={estilos.containerDistintivo}>
-              <Text style={estilos.textoDistintivo}>Repositórios Públicos: {perfil?.public_repos}</Text>
-            </View>
-          </View>
+        <Text style={styles.panelText}>
+          <Text style={styles.bold}>URL Base capturada via .env:</Text>{"\n"}
+          {baseUrl ? baseUrl : '⚠️ Erro: Variável não carregada'}
+        </Text>
+
+        <Text style={styles.panelText}>
+          <Text style={styles.bold}>Token de Acesso em Memória:</Text>{"\n"}
+          {secretToken ? '🔒 •••••••••••• (Injetado de forma segura)' : '⚠️ Oculto ou não configurado'}
+        </Text>
+
+        <Text style={styles.explanationText}>
+          💡 <Text style={styles.bold}>Por que isso é seguro?</Text> O código-fonte não possui nenhuma string contendo chaves reais. Elas são injetadas pelo bundler em tempo de execução.
+        </Text>
+
+        {isHttpsValidated !== null && (
+          <Text style={[styles.badge, isHttpsValidated ? styles.badgeSuccess : styles.badgeDanger]}>
+            {isHttpsValidated ? '🔒 Protocolo HTTPS Validado' : '⚠️ Alerta: Conexão Insegura (HTTP)'}
+          </Text>
         )}
       </View>
 
-      <View style={estilos.painelAuditoria}>
-        <Text style={estilos.auditoriaTitulo}>📊 AUDITORIA DE VARIÁVEIS DE AMBIENTE:</Text>
-        <Text style={estilos.auditoriaCodigo} numberOfLines={1}>
-          URL do .env: {urlApi || "NENHUMA DIRETRIZ DETECTADA"}
-        </Text>
-        <View style={estilos.statusContainer}>
-          <Text style={estilos.auditoriaStatus}>
-            Status do Protocolo: {urlApi.startsWith('https://') ? "🟢 HTTPS ATIVO E SEGURO" : "🔴 HTTP INSEGURO/PROIBIDO"}
-          </Text>
-        </View>
+      {/* Form de busca */}
+      <View style={styles.searchContainer}>
+        <TextInput
+          style={styles.input}
+          placeholder="Digite o username (ex: facebook)"
+          value={username}
+          onChangeText={setUsername}
+          autoCapitalize="none"
+          autoCorrect={false}
+          placeholderTextColor="#999"
+        />
+        <TouchableOpacity
+          style={[styles.button, loading && styles.buttonDisabled]}
+          onPress={fetchUserData}
+          disabled={loading}
+        >
+          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Buscar</Text>}
+        </TouchableOpacity>
       </View>
-    </SafeAreaView>
+
+      {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+
+      {/* Retorno dos dados */}
+      {userData && (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>{userData.name || userData.login}</Text>
+          <Text style={styles.cardBio}>{userData.bio || 'Sem biografia disponível.'}</Text>
+          <View style={styles.row}>
+            <Text style={styles.cardDetail}>Repositórios: {userData.public_repos}</Text>
+            <Text style={styles.cardDetail}>Seguidores: {userData.followers}</Text>
+          </View>
+        </View>
+      )}
+    </ScrollView>
   );
 }
 
-const estilos = StyleSheet.create({
+const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: '#0B0A0F',
+    flexGrow: 1,
+    backgroundColor: '#F8F9FA',
+    paddingHorizontal: 20,
+    paddingVertical: 40,
   },
-  conteudo: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
-  containerCentral: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  textoCarregando: {
-    color: '#9CA3AF',
-    marginTop: 12,
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  cartaoSucesso: {
-    backgroundColor: '#161224',
-    borderRadius: 16,
-    padding: 28,
-    width: '100%',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#7C3AED',
-    shadowColor: '#7C3AED',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
-    elevation: 8,
-  },
-  topoCartao: {
-    alignItems: 'center',
-    marginBottom: 20,
-    width: '100%',
-    borderBottomWidth: 1,
-    borderBottomColor: '#2D2447',
-    paddingBottom: 16,
-  },
-  appTitulo: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
-  },
-  appSubtitulo: {
-    fontSize: 12,
-    color: '#A78BFA',
-    marginTop: 4,
-    fontWeight: '600',
-  },
-  avatar: {
-    width: 110,
-    height: 110,
-    borderRadius: 55,
-    marginBottom: 16,
-    borderWidth: 3,
-    borderColor: '#7C3AED',
-  },
-  perfilNome: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#F3F4F6',
-    marginBottom: 8,
-  },
-  perfilBio: {
-    fontSize: 14,
-    color: '#9CA3AF',
+  title: {
+    fontSize: 26,
+    fontWeight: 'bold',
+    color: '#1A1A1A',
     textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 20,
-    paddingHorizontal: 8,
+    marginTop: 20,
   },
-  containerDistintivo: {
-    backgroundColor: '#2E1065',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
+  subtitle: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 25,
+  },
+  securityPanel: {
+    backgroundColor: '#E9ECEF',
+    padding: 15,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#6D28D9',
+    borderColor: '#CED4DA',
+    marginBottom: 25,
   },
-  textoDistintivo: {
-    color: '#DDD6FE',
-    fontWeight: '700',
-    fontSize: 13,
-  },
-  cartaoErro: {
-    backgroundColor: '#1F1214',
-    borderRadius: 16,
-    padding: 24,
-    width: '100%',
-    borderWidth: 1,
-    borderColor: '#EF4444',
-    shadowColor: '#EF4444',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
-  },
-  erroTitulo: {
-    color: '#EF4444',
-    fontSize: 16,
-    fontWeight: '700',
+  panelTitle: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#212529',
     marginBottom: 10,
   },
-  erroTexto: {
-    color: '#E5E7EB',
-    fontSize: 14,
-    lineHeight: 22,
-  },
-  painelAuditoria: {
-    backgroundColor: '#110E1C',
-    padding: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#221A36',
-  },
-  auditoriaTitulo: {
-    color: '#9CA3AF',
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1,
-    marginBottom: 8,
-  },
-  auditoriaCodigo: {
-    color: '#A78BFA',
-    fontFamily: 'monospace',
-    fontSize: 12,
-    backgroundColor: '#07050C',
-    padding: 12,
-    borderRadius: 8,
+  panelText: {
+    fontSize: 13,
+    color: '#495057',
+    marginBottom: 10,
+    backgroundColor: '#FFF',
+    padding: 8,
+    borderRadius: 5,
     borderWidth: 1,
-    borderColor: '#221A36',
-    marginBottom: 8,
+    borderColor: '#DEE2E6',
   },
-  statusContainer: {
+  explanationText: {
+    fontSize: 12,
+    color: '#6C757D',
+    fontStyle: 'italic',
+    marginTop: 5,
+    marginBottom: 5,
+  },
+  bold: {
+    fontWeight: 'bold',
+  },
+  badge: {
+    marginTop: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 5,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    fontSize: 13,
+    overflow: 'hidden',
+  },
+  badgeSuccess: {
+    backgroundColor: '#D1E7DD',
+    color: '#0F5132',
+  },
+  badgeDanger: {
+    backgroundColor: '#F8D7DA',
+    color: '#842029',
+  },
+  searchContainer: {
     flexDirection: 'row',
+    marginBottom: 15,
+  },
+  input: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#CED4DA',
+    borderRadius: 8,
+    paddingHorizontal: 15,
+    height: 50,
+    fontSize: 16,
+    marginRight: 10,
+    color: '#333'
+  },
+  button: {
+    backgroundColor: '#0D6EFD',
+    borderRadius: 8,
+    width: 90,
+    height: 50,
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  auditoriaStatus: {
+  buttonDisabled: {
+    backgroundColor: '#6C757D',
+  },
+  buttonText: {
     color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  errorText: {
+    color: '#DC3545',
+    fontSize: 14,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginTop: 10,
+  },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    marginTop: 10,
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#212529',
+    marginBottom: 5,
+  },
+  cardBio: {
+    fontSize: 14,
+    color: '#6C757D',
+    marginBottom: 15,
+  },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  cardDetail: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#495057',
   },
 });
